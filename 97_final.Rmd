@@ -10,6 +10,8 @@ library(tidyverse)
 library(janitor)
 library(broom)
 library(gt)
+library(WordR)
+
 
 raw_data <- readxl::read_xlsx("data/country_Set.xlsx") %>% # had to readxl this bc it's not a csv lol feelsbad
   clean_names() %>%
@@ -21,6 +23,7 @@ pop <- readxl::read_xlsx("data/WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xls
 
 
 ```{r data cleaning}
+
 joined <- left_join(raw_data, pop, by = "country") %>%
   select(-variant, -index) %>%
   rename(population = x2020) %>%
@@ -45,129 +48,160 @@ regions <- readxl::read_xlsx("data/regions.xlsx") %>%
   select(country, region, sub_region) %>%
   drop_na()
 
-data <- left_join(joined, regions, by = "country")
+data <- left_join(joined, regions, by = "country") %>%
+  filter(lpm < 40)
 
 ```
 
 
-```{r country sets}
+```{r nationalism plot}
 
-asia <- data %>%
-  filter(region == "Asia")
-
-africa <- data %>%
-  filter(region == "Africa")
-
-oceania <- data %>%
-  filter(region == "Oceania")
-
-europe <- data %>%
-  filter(region == "Europe")
-
-americas <- data %>%
-  filter(region == "Americas")
-
-```
-
-```{r fucking around}
-
-data %>%
-  ggplot(aes(x = ns, y = gcs)) +
+ns_plot <- data %>%
+  drop_na(lpm, ns) %>%
+  ggplot(aes(x = lpm, y = ns, color = region)) +
   geom_point() +
-  geom_smooth(method = "glm")
+  geom_smooth(method = "glm", se = FALSE) +
+  geom_smooth(method = "glm", level = 0, aes(group = 1), color = "black") +
+  theme_classic() + 
+  labs(title = "Nationalism vs. American Fast Food Footprint",
+       subtitle = "Higher Nationalism Score (NS) corresponds with higher levels of nationalism",
+       x = "McDonald's and KFC Locations per Million Residents",
+       y = "Nationalism Score (NS)",
+       color = "Region",
+       caption = "\nData from the World Values Survey, KFC, and McDonald's")
 
-lm(gcs ~ ns, data = data) %>%
-  tidy(conf.int = TRUE)
+
 
 ```
 
 
 ```{r, gcs plots}
-data %>%
-  filter(lpm > 0, country != "United States") %>%
-  drop_na(lpm, gcs) %>%
-  ggplot(aes(x = lpm, y = gcs)) +
-  geom_point() +
-  geom_smooth(method = "glm")
 
-asia %>%
+gcs_plot <- data %>%
   drop_na(lpm, gcs) %>%
-  ggplot(aes(x = lpm, y = gcs)) +
+  ggplot(aes(x = lpm, y = gcs, color = region)) +
   geom_point() +
-  geom_smooth(method = "glm") +
-  xlim(0,60)
+  geom_smooth(method = "glm", se = FALSE) +
+  geom_smooth(method = "glm", level = 0, aes(group = 1), color = "black") +
+  theme_classic() + 
+  labs(title = "World Citizenship vs. American Fast Food Footprint",
+       subtitle = "Higher WCS corresponds with stronger feelings of world citizenship",
+       x = "McDonald's and KFC Locations per Million Residents",
+       y = "World Citizen Score (WCS)",
+       color = "Region",
+       caption = "\nData from the World Values Survey, KFC, and McDonald's")
+
+
 
 ```
 
 
 ```{r, gcs models}
 
-# saving models
-ns_model <- function(x) {
-  
-  lm(lpm ~ ns, data = x) %>%
-    tidy(conf.int = TRUE) %>%
-    gt() %>%
-    tab_header(title = paste(x$region))
-  
-}
-
-# printing
-
-data %>%
-  group_by(region) %>%
-  do(lm(lpm ~ ns, data=.) %>% 
+# overall gcs model
+gcs_all <- data %>%
+  do(lm(lpm ~ gcs, data=.) %>% 
   tidy(conf.int = TRUE) %>%
-  select(term, estimate, p.value, conf.low, conf.high))
+  select(term, estimate, p.value, conf.low, conf.high)) %>%
+  ungroup(region) %>%
+  rename(Term = term, Estimate = estimate, "P-Value" = p.value, 
+         "Upper Bound" = conf.high, "Lower Bound" = conf.low) 
 
-```
-
-
-```{r, ns plots}
-
-ns_plot <- function(x) {
-x %>%
-  drop_na(lpm, ns) %>%
-  ggplot(aes(x = lpm, y = ns)) +
-  geom_point() +
-  geom_smooth(method = "glm", radius = 0) +
-  xlim(0,60) +
-  labs(title = paste(x$region, se = FALSE)) +
-  theme_classic()
-}
-
-ns_plot(asia)
-ns_plot(africa)
-ns_plot(americas)
-ns_plot(europe)
-ns_plot(oceania)
-
-```
-
-
-```{r, ns models}
-
-# saving models
-gcs_model <- function(x) {
-  
-  lm(lpm ~ gcs, data = x) %>%
-    tidy(conf.int = TRUE) %>%
-    gt() %>%
-    tab_header(title = paste(x$region))
-  
-}
-
-
-data %>%
+# gcs by country model
+gcs_by_country <- data %>%
   group_by(region) %>%
   do(lm(lpm ~ gcs, data=.) %>% 
   tidy(conf.int = TRUE) %>%
-  select(term, estimate, p.value, conf.low, conf.high))
+  select(term, estimate, p.value, conf.low, conf.high)) %>%
+  ungroup(region) %>%
+  rename(Region = region, Term = term, Estimate = estimate, "P-Value" = p.value, 
+         "Upper Bound" = conf.high, "Lower Bound" = conf.low) 
+
+# rounding function I ripped off stackoverflow lol
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+
+# applying
+gcs_by_country <- round_df(gcs_by_country, 2)
+gcs_all <- round_df(gcs_all, 2)
+  
+```
+
+```{r, ns models}
+
+# overall gcs model
+ns_all <- data %>%
+  do(lm(lpm ~ ns, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high)) %>%
+  ungroup(region) %>%
+  rename(Term = term, Estimate = estimate, "P-Value" = p.value, 
+         "Upper Bound" = conf.high, "Lower Bound" = conf.low) 
+
+# gcs by country model
+ns_by_country <- data %>%
+  group_by(region) %>%
+  do(lm(lpm ~ ns, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high)) %>%
+  ungroup(region) %>%
+  rename(Region = region, Term = term, Estimate = estimate, "P-Value" = p.value, 
+         "Upper Bound" = conf.high, "Lower Bound" = conf.low) 
+
+# rounding
+ns_by_country <- round_df(ns_by_country, 2)
+ns_all <- round_df(ns_all, 2)
 
 
 ```
 
 
+```{r, US Sentiment}
+
+# uss plot
+uss_plot <- data %>%
+  drop_na(lpm, favorable) %>%
+  ggplot(aes(x = lpm, y = favorable, color = region)) +
+  geom_point() +
+  geom_smooth(method = "glm", se = FALSE) +
+  geom_smooth(method = "glm", level = 0, aes(group = 1), color = "black") +
+  theme_classic() + 
+  labs(title = "US Favorability vs. American Fast Food Footprint",
+       x = "McDonald's and KFC Locations per Million Residents",
+       y = "US Percent Favorability (NS)",
+       color = "Region",
+       caption = "\nData from the Pew Research Center, KFC, and McDonald's")
+
+
+# create model
+uss_by_country <- data %>%
+  group_by(region) %>%
+  drop_na(lpm, favorable) %>%
+  do(lm(lpm ~ favorable, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high))
+
+uss_all <- data %>%
+  drop_na(lpm, favorable) %>%
+  do(lm(lpm ~ favorable, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high))
+
+# round
+uss_by_country <- round_df(uss_by_country, 2)
+uss_all <- round_df(uss_all, 2)
+
+```
+
+```{r converting to word tables}
+
+gcs_by_country
+
+
+```
 
 
 

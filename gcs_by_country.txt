@@ -1,9 +1,0 @@
-"Region","Term","Estimate","P-Value","Lower Bound","Upper Bound"
-"1","Africa","(Intercept)",40.62,0.27,-36.09,117.33
-"2","Africa","ns",-10.61,0.29,-31.58,10.37
-"3","Americas","(Intercept)",3.93,0.75,-23.69,31.55
-"4","Americas","ns",0.31,0.93,-7.46,8.07
-"5","Asia","(Intercept)",66.76,0.03,9.12,124.41
-"6","Asia","ns",-16.23,0.05,-32.55,0.1
-"7","Europe","(Intercept)",-23,0.39,-77.63,31.63
-"8","Europe","ns",11.42,0.17,-5.53,28.38

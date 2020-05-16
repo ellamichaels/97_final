@@ -1,0 +1,9 @@
+Region,Term,Estimate,P-Value,Lower Bound,Upper Bound
+Africa,(Intercept),2.59,0.79,-17.87,23.06
+Africa,gcs,-0.29,0.93,-6.95,6.37
+Americas,(Intercept),5.6,0.68,-25.38,36.58
+Americas,gcs,-0.21,0.96,-10.21,9.79
+Asia,(Intercept),-12.67,0.49,-49.49,24.15
+Asia,gcs,7.81,0.21,-4.61,20.24
+Europe,(Intercept),-9.19,0.46,-34.83,16.46
+Europe,gcs,7.79,0.1,-1.52,17.1
