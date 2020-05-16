@@ -10,14 +10,13 @@ library(tidyverse)
 library(janitor)
 library(broom)
 library(gt)
-library(WordR)
 
 
-raw_data <- readxl::read_xlsx("raw-data/country_Set.xlsx") %>% 
+raw_data <- readxl::read_xlsx("formatted/country_Set.xlsx") %>% 
   clean_names() %>%
   rename(country = country_name) # for joining purposes
 
-pop <- readxl::read_xlsx("raw-data/WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xlsx") %>%
+pop <- readxl::read_xlsx("formatted/WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xlsx") %>%
   clean_names()
 ```
 
@@ -42,7 +41,7 @@ joined <- left_join(raw_data, pop, by = "country") %>%
   select(country, ns, gcs, unfavorable, favorable, lpm)
 
 
-regions <- readxl::read_xlsx("raw-data/regions.xlsx") %>%
+regions <- readxl::read_xlsx("formatted/regions.xlsx") %>%
   clean_names() %>%
   rename(country = name) %>%
   select(country, region, sub_region) %>%
