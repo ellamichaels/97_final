@@ -1,0 +1,174 @@
+---
+title: "97 Final"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(janitor)
+library(broom)
+library(gt)
+
+raw_data <- readxl::read_xlsx("data/country_Set.xlsx") %>% # had to readxl this bc it's not a csv lol feelsbad
+  clean_names() %>%
+  rename(country = country_name) # for joining purposes
+
+pop <- readxl::read_xlsx("data/WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xlsx") %>%
+  clean_names()
+```
+
+
+```{r data cleaning}
+joined <- left_join(raw_data, pop, by = "country") %>%
+  select(-variant, -index) %>%
+  rename(population = x2020) %>%
+  mutate(location_total = kfc_locations + mcd_locations) %>%
+  mutate(nvp = as.numeric(nvp),
+         naap = as.numeric(naap),
+         wa = as.numeric(wa),
+         wsa = as.numeric(wsa),
+         wsd = as.numeric(wsd),
+         wd = as.numeric(wd)) %>%
+  mutate(ns_total = vp + qp + nvp + naap,
+         gcs_total = wsa + wa + wd + wsd) %>%
+  mutate(ns = (4*vp + 3*qp + 2*nvp)/ns_total,
+         gcs = (4*wsa + 3*wa + 2*wd)/gcs_total) %>%
+  mutate(lpm = (location_total/population)*1000) %>% # only multiplying by 1000 because populations are already divided by 1000
+  select(country, ns, gcs, unfavorable, favorable, lpm)
+
+
+regions <- readxl::read_xlsx("data/regions.xlsx") %>%
+  clean_names() %>%
+  rename(country = name) %>%
+  select(country, region, sub_region) %>%
+  drop_na()
+
+data <- left_join(joined, regions, by = "country")
+
+```
+
+
+```{r country sets}
+
+asia <- data %>%
+  filter(region == "Asia")
+
+africa <- data %>%
+  filter(region == "Africa")
+
+oceania <- data %>%
+  filter(region == "Oceania")
+
+europe <- data %>%
+  filter(region == "Europe")
+
+americas <- data %>%
+  filter(region == "Americas")
+
+```
+
+```{r fucking around}
+
+data %>%
+  ggplot(aes(x = ns, y = gcs)) +
+  geom_point() +
+  geom_smooth(method = "glm")
+
+lm(gcs ~ ns, data = data) %>%
+  tidy(conf.int = TRUE)
+
+```
+
+
+```{r, gcs plots}
+data %>%
+  filter(lpm > 0, country != "United States") %>%
+  drop_na(lpm, gcs) %>%
+  ggplot(aes(x = lpm, y = gcs)) +
+  geom_point() +
+  geom_smooth(method = "glm")
+
+asia %>%
+  drop_na(lpm, gcs) %>%
+  ggplot(aes(x = lpm, y = gcs)) +
+  geom_point() +
+  geom_smooth(method = "glm") +
+  xlim(0,60)
+
+```
+
+
+```{r, gcs models}
+
+# saving models
+ns_model <- function(x) {
+  
+  lm(lpm ~ ns, data = x) %>%
+    tidy(conf.int = TRUE) %>%
+    gt() %>%
+    tab_header(title = paste(x$region))
+  
+}
+
+# printing
+
+data %>%
+  group_by(region) %>%
+  do(lm(lpm ~ ns, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high))
+
+```
+
+
+```{r, ns plots}
+
+ns_plot <- function(x) {
+x %>%
+  drop_na(lpm, ns) %>%
+  ggplot(aes(x = lpm, y = ns)) +
+  geom_point() +
+  geom_smooth(method = "glm", radius = 0) +
+  xlim(0,60) +
+  labs(title = paste(x$region, se = FALSE)) +
+  theme_classic()
+}
+
+ns_plot(asia)
+ns_plot(africa)
+ns_plot(americas)
+ns_plot(europe)
+ns_plot(oceania)
+
+```
+
+
+```{r, ns models}
+
+# saving models
+gcs_model <- function(x) {
+  
+  lm(lpm ~ gcs, data = x) %>%
+    tidy(conf.int = TRUE) %>%
+    gt() %>%
+    tab_header(title = paste(x$region))
+  
+}
+
+
+data %>%
+  group_by(region) %>%
+  do(lm(lpm ~ gcs, data=.) %>% 
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, p.value, conf.low, conf.high))
+
+
+```
+
+
+
+
+
+
